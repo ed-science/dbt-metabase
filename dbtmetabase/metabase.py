@@ -229,19 +229,9 @@ class MetabaseClient:
             return
 
         # Empty strings not accepted by Metabase
-        if not model.description:
-            model_description = None
-        else:
-            model_description = model.description
-        if not model.points_of_interest:
-            model_points_of_interest = None
-        else:
-            model_points_of_interest = model.points_of_interest
-        if not model.caveats:
-            model_caveats = None
-        else:
-            model_caveats = model.caveats
-
+        model_description = model.description or None
+        model_points_of_interest = model.points_of_interest or None
+        model_caveats = model.caveats or None
         body_table = {}
         if api_table["description"] != model_description:
             body_table["description"] = model_description
@@ -371,11 +361,7 @@ class MetabaseClient:
             column.visibility_type = "normal"
 
         # Empty strings not accepted by Metabase
-        if not column.description:
-            column_description = None
-        else:
-            column_description = column.description
-
+        column_description = column.description or None
         # Preserve this relationship by default
         if api_field["fk_target_field_id"] is not None and fk_target_field_id is None:
             fk_target_field_id = api_field["fk_target_field_id"]
@@ -415,10 +401,14 @@ class MetabaseClient:
             str -- Metabase database ID.
         """
 
-        for database in self.api("get", "/api/database"):
-            if database["name"].upper() == name.upper():
-                return database["id"]
-        return None
+        return next(
+            (
+                database["id"]
+                for database in self.api("get", "/api/database")
+                if database["name"].upper() == name.upper()
+            ),
+            None,
+        )
 
     def build_metadata_lookups(
         self, database_id: str, schemas_to_exclude: Iterable = None
@@ -678,15 +668,12 @@ class MetabaseClient:
                 self._extract_card_exposures(
                     int(source_table_id.split("__")[-1]), refable_models=refable_models
                 )
-            else:
-                # Normal question
-                source_table = self.table_map.get(source_table_id)
-                if source_table:
-                    logger().info(
-                        ":direct_hit: Model extracted from Metabase question: %s",
-                        source_table,
-                    )
-                    self.models_exposed.append(source_table)
+            elif source_table := self.table_map.get(source_table_id):
+                logger().info(
+                    ":direct_hit: Model extracted from Metabase question: %s",
+                    source_table,
+                )
+                self.models_exposed.append(source_table)
 
             # Find models exposed through joins
             for query_join in query.get("query", {}).get("joins", []):
@@ -699,9 +686,9 @@ class MetabaseClient:
                     )
                     continue
 
-                # Joined model parsed
-                joined_table = self.table_map.get(query_join.get("source-table"))
-                if joined_table:
+                if joined_table := self.table_map.get(
+                    query_join.get("source-table")
+                ):
                     logger().info(
                         ":direct_hit: Model extracted from Metabase question join: %s",
                         joined_table,
@@ -772,10 +759,11 @@ class MetabaseClient:
         """
 
         # Ensure model type is compatible
-        assert exposure_type in (
+        assert exposure_type in {
             "card",
             "dashboard",
-        ), "Cannot construct exposure for object type of {}".format(exposure_type)
+        }, f"Cannot construct exposure for object type of {exposure_type}"
+
 
         if native_query:
             # Format query into markdown code block
@@ -794,8 +782,9 @@ class MetabaseClient:
         metadata = (
             "#### Metadata\n\n"
             + "Metabase Id: __{}__\n\n".format(exposure_id)
-            + "Created On: __{}__".format(created_at)
+            + f"Created On: __{created_at}__"
         )
+
 
         # Build description
         description = (
@@ -815,7 +804,7 @@ class MetabaseClient:
             },
             "depends_on": [
                 refable_models[exposure.upper()]
-                for exposure in list({m for m in self.models_exposed})
+                for exposure in list(set(self.models_exposed))
                 if exposure.upper() in refable_models
             ],
         }

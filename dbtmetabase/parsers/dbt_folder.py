@@ -125,10 +125,11 @@ class DbtFolderReader(DbtReader):
             dict -- One dbt model in Metabase-friendly format.
         """
 
-        metabase_columns: List[MetabaseColumn] = []
+        metabase_columns: List[MetabaseColumn] = [
+            self._read_column(column, schema)
+            for column in model.get("columns", [])
+        ]
 
-        for column in model.get("columns", []):
-            metabase_columns.append(self._read_column(column, schema))
 
         description = model.get("description", "")
         meta = model.get("meta", {})
@@ -136,8 +137,7 @@ class DbtFolderReader(DbtReader):
         caveats = meta.get("metabase.caveats")
 
         if include_tags:
-            tags = model.get("tags", [])
-            if tags:
+            if tags := model.get("tags", []):
                 tags = ", ".join(tags)
                 if description:
                     description += "\n\n"
@@ -186,39 +186,38 @@ class DbtFolderReader(DbtReader):
             tests = []
 
         for test in tests:
-            if isinstance(test, dict):
-                if "relationships" in test:
-                    relationships = test["relationships"]
-                    parsed_table_ref = self.parse_ref(relationships["to"])
-                    if not parsed_table_ref:
-                        logger().warning(
-                            "Could not resolve foreign key target table for column %s",
-                            metabase_column.name,
-                        )
-                        continue
+            if isinstance(test, dict) and "relationships" in test:
+                relationships = test["relationships"]
+                parsed_table_ref = self.parse_ref(relationships["to"])
+                if not parsed_table_ref:
+                    logger().warning(
+                        "Could not resolve foreign key target table for column %s",
+                        metabase_column.name,
+                    )
+                    continue
 
-                    parsed_ref = ".".join(
-                        map(
-                            lambda s: s.strip('"'),
-                            column.get("meta", {})
-                            .get("metabase.foreign_key_target_table", "")
-                            .split("."),
-                        )
+                parsed_ref = ".".join(
+                    map(
+                        lambda s: s.strip('"'),
+                        column.get("meta", {})
+                        .get("metabase.foreign_key_target_table", "")
+                        .split("."),
                     )
-                    if not parsed_ref or "." not in parsed_ref:
-                        parsed_ref = f"{schema}.{parsed_table_ref}"
+                )
+                if not parsed_ref or "." not in parsed_ref:
+                    parsed_ref = f"{schema}.{parsed_table_ref}"
 
-                    metabase_column.semantic_type = "type/FK"
-                    metabase_column.fk_target_table = parsed_ref.upper()
-                    metabase_column.fk_target_field = (
-                        str(relationships["field"]).upper().strip('"')
-                    )
-                    logger().debug(
-                        "Relation from %s to %s.%s",
-                        column.get("name", "").upper().strip('"'),
-                        metabase_column.fk_target_table,
-                        metabase_column.fk_target_field,
-                    )
+                metabase_column.semantic_type = "type/FK"
+                metabase_column.fk_target_table = parsed_ref.upper()
+                metabase_column.fk_target_field = (
+                    str(relationships["field"]).upper().strip('"')
+                )
+                logger().debug(
+                    "Relation from %s to %s.%s",
+                    column.get("name", "").upper().strip('"'),
+                    metabase_column.fk_target_table,
+                    metabase_column.fk_target_field,
+                )
 
         if "meta" in column:
             meta = column.get("meta", [])
@@ -239,10 +238,7 @@ class DbtFolderReader(DbtReader):
             str -- Name of the reference.
         """
 
-        # matches = re.findall(r"ref\(['\"]([\w\_\-\ ]+)['\"]\)", text)
-        # We are catching the rightmost argument of either source or ref which is ultimately the table name
-        matches = re.findall(r"['\"]([\w\_\-\ ]+)['\"][ ]*\)$", text.strip())
-        if matches:
+        if matches := re.findall(r"['\"]([\w\_\-\ ]+)['\"][ ]*\)$", text.strip()):
             logger().debug("%s -> %s", text, matches[0])
             return matches[0]
         return None
