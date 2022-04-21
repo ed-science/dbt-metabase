@@ -225,13 +225,13 @@ class DbtManifestReader(DbtReader):
                     "fk_target_field": fk_target_field,
                 }
 
-        for _, column in model.get("columns", {}).items():
-            metabase_column.append(
-                self._read_column(
-                    column=column,
-                    relationship=relationship_tests.get(column["name"]),
-                )
+        metabase_column.extend(
+            self._read_column(
+                column=column,
+                relationship=relationship_tests.get(column["name"]),
             )
+            for _, column in model.get("columns", {}).items()
+        )
 
         description = model.get("description", "")
         meta = model.get("meta", {})
@@ -239,11 +239,10 @@ class DbtManifestReader(DbtReader):
         caveats = meta.get("metabase.caveats")
 
         if include_tags:
-            tags = model.get("tags", [])
-            if tags:
-                tags = ", ".join(tags)
+            if tags := model.get("tags", []):
                 if description != "":
                     description += "\n\n"
+                tags = ", ".join(tags)
                 description += f"Tags: {tags}"
 
         unique_id = model["unique_id"]

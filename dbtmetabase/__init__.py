@@ -31,7 +31,7 @@ class MultiArg(click.Option):
 
     def __init__(self, *args, **kwargs):
         nargs = kwargs.pop("nargs", -1)
-        assert nargs == -1, "nargs, if set, must be -1 not {}".format(nargs)
+        assert nargs == -1, f"nargs, if set, must be -1 not {nargs}"
         super(MultiArg, self).__init__(*args, **kwargs)
         self._previous_parser_process = None
         self._eat_all_parser = None
@@ -77,7 +77,7 @@ class ListParam(click.Tuple):
         len_value = len(value)
         types = [self.type] * len_value
 
-        return list(ty(x, param, ctx) for ty, x in zip(types, value))
+        return [ty(x, param, ctx) for ty, x in zip(types, value)]
 
 
 class OptionAcceptableFromConfig(click.Option):

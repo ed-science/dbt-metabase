@@ -249,8 +249,8 @@ class MockMetabaseClient(MetabaseClient):
         return "dummy"
 
     def api(self, method: str, path: str, **kwargs):
-        BASE_PATH = "tests/fixtures/mock_api/"
         if method == "get":
+            BASE_PATH = "tests/fixtures/mock_api/"
             if os.path.exists(f"{BASE_PATH}/{path.lstrip('/')}.json"):
                 with open(f"{BASE_PATH}/{path.lstrip('/')}.json") as f:
                     return json.load(f)
@@ -333,10 +333,12 @@ class TestMetabaseClient(unittest.TestCase):
         for table, columns in zip(baseline_tables, baseline_columns):
             self.assertEqual(columns, list(field_lookups[table].keys()))
         baseline_table_lookups = json.load(
-            open(f"tests/fixtures/lookups/table_lookups.json")
+            open("tests/fixtures/lookups/table_lookups.json")
         )
+
         baseline_field_lookups = json.load(
-            open(f"tests/fixtures/lookups/field_lookups.json")
+            open("tests/fixtures/lookups/field_lookups.json")
         )
+
         self.assertEqual(baseline_table_lookups, table_lookups)
         self.assertEqual(baseline_field_lookups, field_lookups)
